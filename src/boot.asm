@@ -9,34 +9,38 @@
 [BITS 16]
 
 cli
-mov ax, 0x7c0
-mov ds, ax
+mov ax, 0x7c00
 mov ss, ax
-mov sp, 0x0
-mov ax, 0x200
+mov ds, ax
+
+mov ax, 0x2000
 mov es, ax
+
+xor ax, ax
+xor bx, bx
 sti
 
 initing:
-    mov dh, 0x0
-    mov ax, 0x200
+    xor dh, dh
     mov es, ax
     xor ax, ax
 
     xor cx, cx
     inc cx
 
-    mov ch, 0b11111111
+    dec ch
+    ; mov ch, 0b11111111
 
     push 0x10
 
-
-booting_loop:
-    mov bx, es
-    cmp bx, 0x800
-    jz boot_success
-
+; reading first 21 cylinders
+; after that we will need to read 12 sectors of next cylinder 
+booting_loop:    
     inc ch
+
+    mov bx, es
+    cmp bx, 0x8000
+    jz read_tail
 
     ; assuming: 
     ;   ES mutated only here
@@ -59,37 +63,61 @@ booting_loop:
             cmp  bp, 0x4
             jz   boot_fail
             pop  ax
+            push ax
             mov  ah, 0x2
             inc  bp
             int  0x13
             jc   attempt
 
        
-        xor ah, ah
-
+        pop ax
         mov bx, ax
         xor bx, SECTORS_COUNT_MASK
         push bx
 
         xor cl, SECTOR_OFFSET_MASK
 
-        shl ax, 0x1
+        shl ax, 0x5
         mov bx, es
         add bx, ax
         mov es, bx
 
-        cmp ax, 0x20
+        cmp ax, 0x200
         jz attempt_init
-
 
         ; move head next
         ; head in [0; 1]: dh xor 1 <=> 0 -> 1 -> 1...  
         xor dh, 0x1 
        
-        cmp cl, 0
+        cmp cl, 0x10
         jz booting_loop
 
         jmp attempt_init
+        
+; reading last 12 sectors
+; assuming:
+;   CX is set
+;   ES is set
+;   DX is set
+; MUTATED registers:
+;   AX, BX, BP
+read_tail:
+
+    xor bx, bx
+    xor bp, bp
+
+    tail_read_attempt:
+        cmp bp, 0x4
+        jz boot_fail
+        
+        mov ah, 0x2
+        mov al, 0xc
+
+        inc bp
+        int 0x13
+        jc tail_read_attempt 
+
+    jmp boot_success
         
  
 ; if we somehow got here, 
