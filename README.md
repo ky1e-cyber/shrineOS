@@ -1,2 +1,3 @@
 # shrineOS
-x86 simple OS from scratch
+### Safest heuristics church
+Simple x86 OS from scratch
